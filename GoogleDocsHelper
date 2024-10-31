@@ -1,18 +1,42 @@
  /**
  * @OnlyCurrentDoc
  */
-function insertRows() {
-  // Get active sheet and insert 10 rows above the second row
+function getDateValues() {
+  const departureDate = getDateValue('L2');
+  const arrivalDate = getDateValue('K2');
+  const dayOfMonth = arrivalDate.getDate();
+  
+  var totalWeekDays = 0;
+  var totalWeekendDays = 0;
+  var totalMonths = -1;
+
+  for (var dateAtSchool = new Date(arrivalDate.getTime()); dateAtSchool <= departureDate; dateAtSchool.setDate(dateAtSchool.getDate()+1)){
+      if (dateAtSchool.getDay() == 6 || dateAtSchool.getDay() == 0) {
+          totalWeekendDays++;
+      } else {
+          totalWeekDays++;
+      }
+	  
+	  if (dateAtSchool.getDate() == dayOfMonth || (previousDayOfMonth < dayOfMonth && dateAtSchool.getDate() < previousDayOfMonth)) {
+        totalMonths++;
+      } 
+	  
+	  previousDayOfMonth = dateAtSchool.getDate();
+  }
+   
+  setValue("H2", totalWeekDays);
+  setValue("I2", totalWeekendDays/2);
+  setValue("J2", totalMonths);
+}
+
+function getDateValue(cellId) {
   const sheet = SpreadsheetApp.getActiveSheet();
-  sheet.insertRows(2, 11);
+  const range = sheet.getRange(cellId);
 
-  // Get range of the new rows and set their background color to white
-  const newRange = sheet.getRange(2, 1, 10, sheet.getLastColumn());
+  return new Date(range.getValue());
+}
 
-  // Get range of the first 10 rows in the "Templates" sheet
-  const templatesSheet = SpreadsheetApp.getActive().getSheetByName("Template");
-  const templatesRange = templatesSheet.getRange(1, 1, 11, sheet.getLastColumn());
-
-  // Copy values and formulas from the templates range to the new range
-  templatesRange.copyTo(newRange, { contentsOnly: false });
+function setValue(cellId, value) {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  sheet.getRange(cellId).setValue(value);
 }
