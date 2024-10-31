@@ -1,0 +1,18 @@
+ /**
+ * @OnlyCurrentDoc
+ */
+function insertRows() {
+  // Get active sheet and insert 10 rows above the second row
+  const sheet = SpreadsheetApp.getActiveSheet();
+  sheet.insertRows(2, 11);
+
+  // Get range of the new rows and set their background color to white
+  const newRange = sheet.getRange(2, 1, 10, sheet.getLastColumn());
+
+  // Get range of the first 10 rows in the "Templates" sheet
+  const templatesSheet = SpreadsheetApp.getActive().getSheetByName("Template");
+  const templatesRange = templatesSheet.getRange(1, 1, 11, sheet.getLastColumn());
+
+  // Copy values and formulas from the templates range to the new range
+  templatesRange.copyTo(newRange, { contentsOnly: false });
+}
