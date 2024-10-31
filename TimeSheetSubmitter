@@ -1,0 +1,142 @@
+import os
+import shutil
+import csv
+import openpyxl
+from openpyxl import utils
+from openpyxl import load_workbook
+
+def fill_timesheets(base_folder_path):
+    template_file_path = get_template_file_path(base_folder_path)
+    english_month = get_month(template_file_path)
+
+    month_folder_path = os.path.join(base_folder_path, english_month)
+    os.makedirs(month_folder_path, exist_ok=True)
+
+    for file in os.listdir(base_folder_path):
+        if file.endswith(".csv"):
+            log_file_path = os.path.join(base_folder_path, file)
+            fill_timesheet(template_file_path, log_file_path, month_folder_path)
+
+def fill_timesheet(template_file_path, log_file_path, month_folder_path):
+    shutil.move(log_file_path, month_folder_path)
+
+    consultant_name = get_consultant_name(log_file_path)
+
+    extracted_data = extract_data_from_csv(os.path.join(month_folder_path, os.path.basename(log_file_path)))
+    
+    new_template_file_path = rename_template_file(template_file_path, consultant_name)
+    
+    update_timesheet_data(new_template_file_path, extracted_data, month_folder_path, consultant_name)
+
+def get_consultant_name(log_file_path):
+    file_name = os.path.basename(log_file_path)
+    words = file_name.split("_")
+    if len(words) >= 3:
+        consultant_name = words[1] + " " + words[2]
+        return consultant_name
+    else:
+        raise ValueError("Invalid file name format. Unable to extract consultant name.")
+
+def extract_data_from_csv(file_path):
+    data = []
+    with open(file_path, 'r') as file:
+        csv_reader = csv.reader(file)
+        rows = list(csv_reader)
+        last_row = rows[-1]
+        for value in last_row[4:]:
+            data.append(value)
+    return data
+
+def update_timesheet_data(xlsx_file_path, data, month_folder_path, consultant_name):
+    xlsx_copy_path = os.path.join(month_folder_path, os.path.basename(xlsx_file_path))
+    shutil.copy(xlsx_file_path, xlsx_copy_path)
+
+    workbook = load_workbook(xlsx_copy_path)
+    worksheet = workbook.active
+
+    row = 28
+    carry_over = 0
+    max_value = 8
+
+    for i, value in enumerate(data):
+        if value:
+            if i < 31:
+                column_letter = utils.get_column_letter(i + 1)
+                cell = worksheet[f'{column_letter}{row}']
+                
+                if cell.value is None:
+                    cell.value = 0
+
+                if not str(cell.value).isalpha() and cell.value < max_value:
+                    available_space = max_value - cell.value
+                    total_value = min(float(value) + carry_over, available_space)
+                    carry_over = max(0, float(value) + carry_over - available_space)
+                    cell.value += total_value
+
+                    # Check if there is a carry-over value
+                    while carry_over > 0:
+                        i += 1
+                        if i < 31:
+                            column_letter = utils.get_column_letter(i + 1)
+                            cell = worksheet[f'{column_letter}{row}']
+                            
+                            if cell.value is None:
+                                cell.value = 0
+
+                            if not str(cell.value).isalpha() and cell.value < max_value:
+                                available_space = max_value - cell.value
+                                total_value = min(carry_over, available_space)
+                                carry_over -= total_value
+                                cell.value += total_value
+                        else:
+                            break
+
+    worksheet.merge_cells("G16:I16")
+    merged_cell = worksheet['G16']
+    merged_cell.value = consultant_name
+
+    workbook.save(xlsx_copy_path)
+
+def rename_template_file(template_file_path, consultant_name):
+    file_dir, file_name = os.path.split(template_file_path)
+    new_file_name = file_name.replace("Nom du consultant", consultant_name)
+    new_file_path = os.path.join(file_dir, new_file_name)
+    os.rename(template_file_path, new_file_path)
+    
+    return new_file_path
+
+def get_month(template_file_path):
+    wb = load_workbook(template_file_path)
+    sheet = wb.active
+    french_month = str(sheet.cell(row=12, column=5).value).upper()
+
+    english_month = french_to_english.get(french_month)
+
+    if english_month:
+        return english_month
+    else:
+        raise NameError("Invalid or unsupported French month in the template.")
+
+def get_template_file_path(folder_path):
+    for file in os.listdir(folder_path):
+        if file.endswith(".xlsx"):
+            return os.path.join(folder_path, file)
+        
+    raise FileNotFoundError("Template file not found.")
+
+french_to_english = {
+    "JANVIER": "January",
+    "FÉVRIER": "February",
+    "MARS": "March",
+    "AVRIL": "April",
+    "MAI": "May",
+    "JUIN": "June",
+    "JUILLET": "July",
+    "AOÛT": "August",
+    "SEPTEMBRE": "September",
+    "OCTOBRE": "October",
+    "NOVEMBRE": "November",
+    "DÉCEMBRE": "December"
+}
+
+base_folder_path = "/Users/dimitarmitev/Desktop/Work"  # Replace with the actual folder path
